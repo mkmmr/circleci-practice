@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TagName:
+    Description: this is base name.
+    Type: String
+    Default: CFn-raisetech
+
+  VPCCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnetACIDR:
+    Type: String
+    Default: 10.0.10.0/24
+
+  PublicSubnetCCIDR:
+    Type: String
+    Default: 10.0.11.0/24
+
+  PrivateSubnetACIDR:
+    Type: String
+    Default: 10.0.20.0/24
+
+  PrivateSubnetCCIDR:
+    Type: String
+    Default: 10.0.21.0/24
+
+
+Resources:
+# ------------------------------------------------------------#
+#  VPC
+# ------------------------------------------------------------#
+  CFnVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-vpc
+
+# ------------------------------------------------------------#
+#  Subnet
+# ------------------------------------------------------------#
+
+  CFnPublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PublicSubnetACIDR
+      VpcId: !Ref CFnVPC
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-public-subnet-a
+
+  CFnPublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PublicSubnetCCIDR
+      VpcId: !Ref CFnVPC
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-public-subnet-c
+
+  CFnPrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PrivateSubnetACIDR
+      VpcId: !Ref CFnVPC
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-private-subnet-a
+
+  CFnPrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PrivateSubnetCCIDR
+      VpcId: !Ref CFnVPC
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-private-subnet-c
+
+# ------------------------------------------------------------#
+#  InternetGateway
+# ------------------------------------------------------------#
+  CFnInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-igw
+
+# IGW Attach
+  CFnInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref CFnInternetGateway
+      VpcId: !Ref CFnVPC
+
+# ------------------------------------------------------------#
+#  RouteTable
+# ------------------------------------------------------------#
+# create RouteTable
+  CFnPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CFnVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-public-route
+
+# Routing
+  CFnRouteForPublicSubnet:
+    Type: AWS::EC2::Route
+    Properties: 
+      RouteTableId: !Ref CFnPublicRouteTable 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref CFnInternetGateway 
+
+# RouteTable Associate
+  CFnPublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref CFnPublicSubnetA
+      RouteTableId: !Ref CFnPublicRouteTable
+
+  CFnPublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref CFnPublicSubnetC
+      RouteTableId: !Ref CFnPublicRouteTable
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#                
+Outputs:
+  StackVPC:
+    Value: !Ref CFnVPC
+    Export:
+      Name: !Sub ${TagName}-vpc
+  
+  StackPublicSubnetA:
+    Value: !Ref CFnPublicSubnetA
+    Export:
+      Name: !Sub ${TagName}-public-subnet-a
+
+  StackPublicSubnetC:
+    Value: !Ref CFnPublicSubnetC
+    Export:
+      Name: !Sub ${TagName}-public-subnet-c
+
+  StackPrivateSubnetA:
+    Value: !Ref CFnPrivateSubnetA
+    Export:
+      Name: !Sub ${TagName}-private-subnet-a
+
+  StackPrivateSubnetC:
+    Value: !Ref CFnPrivateSubnetC
+    Export:
+      Name: !Sub ${TagName}-private-subnet-c
