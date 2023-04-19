@@ -2,25 +2,59 @@
 # See: https://circleci.com/docs/configuration-reference
 version: 2.1
 
+orbs:
+  aws-cli: circleci/aws-cli@3.1.5
+
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/configuration-reference/#jobs
-jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/configuration-reference/#executor-job
+
+executors:
+  node:
     docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/configuration-reference/#steps
+      - image: circleci/node # deprecated
+
+# commands:
+
+jobs:
+  assume:
+    executor: node
     steps:
       - checkout
+      - aws-cli/install
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          name: Assume role
+          command: |
+            aws_sts_credentials=$(aws sts assume-role-with-web-identity \
+              --role-arn ${AWS_IAM_ROLE_ARN} \
+              --web-identity-token ${CIRCLE_OIDC_TOKEN} \
+              --role-session-name "circleci-oidc" \
+              --duration-seconds 900 \
+              --query "Credentials" \
+              --output "json")
+            echo export AWS_ACCESS_KEY_ID="$(echo $aws_sts_credentials | jq -r '.AccessKeyId')" >> $BASH_ENV
+            echo export AWS_SECRET_ACCESS_KEY="$(echo $aws_sts_credentials | jq -r '.SecretAccessKey')" >> $BASH_ENV
+            echo export AWS_SESSION_TOKEN="$(echo $aws_sts_credentials | jq -r '.SessionToken')" >> $BASH_ENV
+            source $BASH_ENV
+      # - run: 
+      #     name: Some deploy
+      #     command: aws sts get-caller-identity
+      # - aws-cli/assume-role-with-web-identity:
+      #     role-arn: AWS_IAM_ROLE_ARN
+      - run:
+          name: deploy CloudFormation
+          command: |
+            set -x
+            aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleCINetwork
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
+  # oidc:
+  #   jobs:
+  #     - aws-oidc:
+  #         context: aws # Context を設定しないと OIDC が使用できないので注意
+  version: 2
+  release:
     jobs:
-      - say-hello
+      - assume:
+          context: aws
