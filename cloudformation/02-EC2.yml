@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TagName:
+    Description: this is base name.
+    Type: String
+    Default: CFn-raisetech
+
+Resources:
+# ------------------------------------------------------------#
+#  EC2
+# ------------------------------------------------------------#
+# create EC2
+  CFnEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-078296f82eb463377
+      InstanceType: t2.micro
+      KeyName: circleci-ec2-key
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: {'Fn::ImportValue': !Sub '${TagName}-public-subnet-a'}
+          GroupSet:
+            - !Ref CFnEC2SecurityGroup
+      UserData: !Base64 |
+        #!/bin/bash
+        sudo yum update
+      Tags:
+          - Key: Name
+            Value: !Sub ${TagName}-ec2
+
+# create EC2 Security Group
+  CFnEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${TagName}-ec2-sg
+      GroupDescription: Allow SSH and HTTP access
+      VpcId: {'Fn::ImportValue': !Sub '${TagName}-vpc'}
+      SecurityGroupIngress:
+        # http
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        # ssh
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        # rails
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+
+# ------------------------------------------------------------#
+# ElasticIP
+# ------------------------------------------------------------#                
+# create ElasticIP
+  # CFnElasticIP:
+  #   Type: "AWS::EC2::EIP"
+  #   Properties:
+  #     Domain: vpc
+
+  # CFnElasticIPAssociate:
+  #   Type: AWS::EC2::EIPAssociation
+  #   Properties: 
+  #     AllocationId: !GetAtt CFnElasticIP.AllocationId
+  #     InstanceId: !Ref CFnEC2
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#                
+Outputs:
+  StackEC2:
+    Value: !Ref CFnEC2
+    Export:
+      Name: !Sub ${TagName}-ec2
+
+  StackEC2sg:
+    Value: !Ref CFnEC2SecurityGroup
+    Export:
+      Name: !Sub ${TagName}-ec2-sg
