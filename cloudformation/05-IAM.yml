@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TagName:
+    Description: this is base name.
+    Type: String
+    Default: CFn-raisetech
+
+Resources:
+# ------------------------------------------------------------#
+#  IAM
+# ------------------------------------------------------------#
+# create IAM
+  CFnIAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub ${TagName}-railsadmin
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+# create Access Key
+  CFnIAMUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref CFnIAMUser
+
+# set Access Key on SecretManager
+  CFnIAMUserAccessKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${CFnIAMUser}-credentials
+      SecretString: !Sub "{\"accessKeyId\":\"${CFnIAMUserAccessKey}\",\"secretAccessKey\":\"${CFnIAMUserAccessKey.SecretAccessKey}\"}"
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#                
+Outputs:
+  StackIAM:
+    Value: !Ref CFnIAMUser
+    Export:
+      Name: !Sub ${TagName}-iamuser
+
+  StackIAMAccessKey:
+    Value: !Ref CFnIAMUserAccessKey
+    Export:
+      Name: !Sub ${TagName}-iamuser-accesskey
+
+  StackIAMSecretAccessKey:
+    Value: !Sub ${CFnIAMUserAccessKey.SecretAccessKey}
+    Export:
+      Name: !Sub ${TagName}-iamuser-secretaccesskey

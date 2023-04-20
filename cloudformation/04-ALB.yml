@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TagName:
+    Description: this is base name.
+    Type: String
+    Default: CFn-raisetech
+
+Resources:
+# ------------------------------------------------------------#
+#  ALB
+# ------------------------------------------------------------#
+# create ALB
+  CFnALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${TagName}-alb
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      SecurityGroups: 
+        - !Ref CFnALBSecurityGroup
+      Subnets: 
+        - {'Fn::ImportValue': !Sub '${TagName}-public-subnet-a'}
+        - {'Fn::ImportValue': !Sub '${TagName}-public-subnet-c'}
+      Tags: 
+        - Key: Name
+          Value: !Sub ${TagName}-alb
+
+# create ALB security group
+  CFnALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${TagName}-alb-sg
+      GroupDescription: Allow http access
+      VpcId: {'Fn::ImportValue': !Sub '${TagName}-vpc'}
+      SecurityGroupIngress:
+        # http
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+# create Target Group
+  CFnALBTrgetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      Name: !Sub ${TagName}-tg
+      VpcId: {'Fn::ImportValue': !Sub '${TagName}-vpc'}
+      TargetType: instance
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+      Targets:
+        - Id: {'Fn::ImportValue': !Sub '${TagName}-ec2'}
+          Port: 80
+      Tags: 
+        - Key: Name
+          Value: !Sub ${TagName}-alb-tg
+
+# create Listner
+  CFnALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref CFnALBTrgetGroup
+          Type: forward
+      LoadBalancerArn: !Ref CFnALB
+      Port: 80
+      Protocol: HTTP

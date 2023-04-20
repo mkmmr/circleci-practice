@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TagName:
+    Description: this is base name.
+    Type: String
+    Default: CFn-raisetech
+
+Resources:
+# ------------------------------------------------------------#
+#  S3
+# ------------------------------------------------------------#
+# create S3
+  CFnS3:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cfn-raisetech
+      PublicAccessBlockConfiguration: 
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+      Tags: 
+        - Key: Name
+          Value: !Sub ${TagName}-s3
+
+# create Bucket Policy
+  CFnBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket: !Ref CFnS3
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Statement1
+            Effect: Allow
+            Principal:
+              AWS: # !Sub arn:aws:iam::${AWS::AccountId}:user/${TagName}-railsadmin
+                - Fn::Join:
+                  - ''
+                  - - 'arn:aws:iam::'
+                    - !Ref AWS::AccountId
+                    - ':user/'
+                    -  {'Fn::ImportValue': !Sub '${TagName}-iamuser'}
+            Action: S3:*
+            Resource:
+              - !Sub arn:aws:s3:::${CFnS3}
+              - !Sub arn:aws:s3:::${CFnS3}/*
