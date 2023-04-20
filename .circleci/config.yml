@@ -43,20 +43,24 @@ jobs:
             aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
             aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
             aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
-            aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM
+            aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
             aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
-
       - run:
           name: set environment variable
           command: |
             set -x
-            echo export EC2_PUBLIC_IP_ADDRESS="$(aws ec2 describe-instances --filters "Name=tag:aws:cloudformation:stack-name,Values=CircleciEC2" --query 'Reservations[].Instances[].PublicIpAddress[]' --output text | tr '\t' '\n')" >> $BASH_ENV
-            echo export AWS_ALB="$(aws elbv2 describe-load-balancers --query "LoadBalancers[].[DNSName]" --output text | tr '\t' '\n' | grep "CFn")" >> $BASH_ENV
-            echo export S3_IAM_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name AnsibleIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMAccessKey")| .OutputValue')" >> $BASH_ENV
-            echo export S3_IAM_SECRET_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name AnsibleIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMSecretAccessKey")| .OutputValue')" >> $BASH_ENV
-            
+            echo export EC2_PUBLIC_IP_ADDRESS="$(echo $aws ec2 describe-instances --filters "Name=tag:aws:cloudformation:stack-name,Values=CircleciEC2" --query 'Reservations[].Instances[].PublicIpAddress[]' --output text | tr '\t' '\n')" >> $BASH_ENV
+            echo export AWS_ALB="$(echo $aws elbv2 describe-load-balancers --query "LoadBalancers[].[DNSName]" --output text | tr '\t' '\n' | grep "CFn")" >> $BASH_ENV
+            echo export S3_IAM_ACCESS_KEY="$(echo $aws cloudformation describe-stacks --stack-name AnsibleIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMAccessKey")| .OutputValue')" >> $BASH_ENV
+            echo export S3_IAM_SECRET_ACCESS_KEY="$(echo $aws cloudformation describe-stacks --stack-name AnsibleIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMSecretAccessKey")| .OutputValue')" >> $BASH_ENV
             source $BASH_ENV
-
+      - run:
+          name: test
+          command: |
+            echo ${EC2_PUBLIC_IP_ADDRESS:0:-1}
+            echo ${AWS_ALB:0:-1}
+            echo ${S3_IAM_ACCESS_KEY:0:-1}
+            echo ${S3_IAM_SECRET_ACCESS_KEY:0:-1}
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
