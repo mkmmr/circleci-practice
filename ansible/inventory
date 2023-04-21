@@ -1,6 +1,1 @@
-all:
-  hosts: 
-    ansible_dev_target: 
-      ansible_host: ${EC2_PUBLIC_IP_ADDRESS}
-      ansible_connection: ssh
-      ansible_user: ec2-user
+

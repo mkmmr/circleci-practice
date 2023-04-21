@@ -73,12 +73,8 @@ jobs:
       - run: |
           cat bash.env >> $BASH_ENV
       - run:
-          name: get envs
-          command: |
-            echo 'EC2_PUBLIC_IP_ADDRESS: '${EC2_PUBLIC_IP_ADDRESS:0:-1}
-            echo 'AWS_ALB: '${AWS_ALB:0:-1}
-            echo 'S3_IAM_ACCESS_KEY: '${S3_IAM_ACCESS_KEY:0:-1}
-            echo 'S3_IAM_SECRET_ACCESS_KEY: '${S3_IAM_SECRET_ACCESS_KEY:0:-1}
+          name: set inventory file
+          command: sed -i "1i ansible_dev_target ansible_host=${EC2_PUBLIC_IP_ADDRESS} ansible_connection=ssh ansible_user=ec2-user" ansible/inventory
       - add_ssh_keys:
           fingerprints:
             - "a8:4a:8c:12:da:47:4a:2f:30:7c:1d:2a:0e:24:0f:67"
@@ -86,7 +82,7 @@ jobs:
           version: 2.10.7
       - ansible-playbook/playbook:
           playbook: ansible/playbook.yml
-          playbook-options: '-i ansible/inventory'
+          playbook-options: 'yes | -i ansible/inventory'
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
