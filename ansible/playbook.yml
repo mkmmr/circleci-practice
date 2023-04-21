@@ -1,0 +1,16 @@
+---
+- hosts: ansible_dev_target
+  become: true
+  become_user: ec2-user
+  roles:
+    - { role: 01_yum, tags: yum }
+    # - { role: 02_ruby, tags: ruby }
+    # - { role: 03_AppDeploy, tags: deploy }
+    # - { role: 04_MySQL, tags: mysql }
+    # - { role: 05_Nginx, tags: nginx }
+    # - { role: 06_unicorn, tags: unicorn }
+    # - { role: 07_S3, tags: s3 }
+  vars: 
+    ansible_user_dir: "/home/ec2-user"
+    app_dir: "/var/www/raisetech-live8-sample-app"
+    app_name: "raisetech-live8-sample-app"

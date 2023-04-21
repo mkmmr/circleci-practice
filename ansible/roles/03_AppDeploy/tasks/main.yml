@@ -1,0 +1,20 @@
+---
+- name: git clone app
+  become_user: root
+  git: 
+    repo: "{{ sampleApp_url }}"
+    dest: "{{ app_dir }}"
+
+- name: change owner /var/www/raisetech-live8-sample-app
+  become_user: root
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: ec2-user
+    recurse: yes
+
+
+- name: bundle install
+  shell: bash -lc "bundle install"
+  args: 
+    chdir: "{{ app_dir }}"

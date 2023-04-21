@@ -1,0 +1,140 @@
+---
+# -----------------------------------------------------
+# rbenv
+# -----------------------------------------------------
+- name: check rbenv install
+  command: "{{ rbenv_path }}/bin/rbenv --version"
+  register: rbenv_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: rbenv install
+  git:
+    repo: https://github.com/sstephenson/rbenv.git
+    dest: "{{ rbenv_path }}"
+  when: rbenv_exists is failed
+
+- name: PATH for rbenv
+  blockinfile:
+    dest: "{{ ansible_user_dir }}/.bash_profile"
+    create: yes
+    insertafter: '^PATH=\$PATH:\$HOME/bin$'
+    content: |
+      export PATH="$HOME/.rbenv/bin:$PATH"
+      eval "$(rbenv init -)"
+  when: rbenv_exists is failed
+
+- name: reflect .bash_profile
+  shell: bash -lc "source {{ ansible_user_dir }}/.bash_profile"
+
+# -----------------------------------------------------
+# ruby
+# -----------------------------------------------------
+- name: check ruby install
+  shell: bash -lc "rbenv version | grep {{ ruby_version }}"
+  register: ruby_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: ruby-build install
+  git:
+    repo: https://github.com/rbenv/ruby-build.git
+    dest: "{{ ruby_path }}"
+  when: ruby_exists is failed
+
+- name: ruby install
+  shell: bash -lc "rbenv install {{ ruby_version }}"
+  timeout: 1200
+  when: ruby_exists is failed
+
+- name: check rbenv global
+  shell: bash -lc "rbenv version | grep {{ ruby_version }}"
+  register: rbenv_default
+  changed_when: False
+  ignore_errors: True
+
+- name: set rbenv global
+  shell: bash -lc "rbenv global {{ ruby_version }}"
+  when: rbenv_default is failed
+
+- name: rbenv rehash
+  shell: bash -lc "rbenv rehash"
+  when: rbenv_default is failed
+
+# -----------------------------------------------------
+# rails
+# -----------------------------------------------------
+- name: check rails install
+  shell: bash -lc "gem list -e rails | grep {{ rails_version }}"
+  register: rails_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: rails install
+  gem: 
+    name: rails
+    version: "{{ rails_version }}"
+    executable: "{{ rbenv_path }}/shims/gem"
+    user_install: no
+  timeout: 300
+  when: rails_exists is failed
+
+# -----------------------------------------------------
+# nodejs
+# -----------------------------------------------------
+- name: check node.js install
+  shell: node --version
+  register: nodejs_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: Setup Yum repo for Nodejs
+  become_user: root
+  shell: "curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -"
+  when: nodejs_exists is failed
+
+- name: node.js install
+  become_user: root
+  yum: 
+    name: nodejs
+    state: latest
+  when: nodejs_exists is failed
+
+# -----------------------------------------------------
+# yarn
+# -----------------------------------------------------
+- name: check yarn install
+  shell: yarn --version
+  register: yarn_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: Setup Yum repo for yarn
+  become_user: root
+  shell: "curl -sL https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo"
+  when: yarn_exists is failed
+
+- name: yarn install
+  become_user: root
+  yum: 
+    name: yarn
+    state: latest
+  when: yarn_exists is failed
+
+# -----------------------------------------------------
+# bundler
+# -----------------------------------------------------
+- name: check bundler install
+  shell: bash -lc "bundler version | grep {{ bundler_version }}"
+  register: bundler_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: bundler install
+  gem: 
+    name: bundler
+    version: "{{ bundler_version }}"
+    executable: "{{ rbenv_path }}/shims/gem"
+    user_install: no
+  timeout: 300
+  when: bundler_exists is failed

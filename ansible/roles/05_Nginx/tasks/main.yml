@@ -1,0 +1,34 @@
+---
+- name: check Nginx install
+  shell: nginx --version
+  register: nginx_exists
+  changed_when: no
+  ignore_errors: yes
+
+- name: Nginx install
+  become_user: root
+  shell: amazon-linux-extras install nginx1 -y
+  when: nginx_exists is failed
+
+- name: add /etc/nginx/conf.d/{{ app_name }}.conf
+  become_user: root
+  template:
+    src: "{{ app_name }}.conf.j2"
+    dest: "/etc/nginx/conf.d/{{ app_name }}.conf"
+  when: nginx_exists is failed
+
+- name: chenge nginx permission
+  become_user: root
+  file: 
+    path: /var/lib
+    state: directory
+    mode: '0775'
+    recurse: yes
+
+- name: start nginx
+  shell: |
+    sudo systemctl enable nginx
+    sudo systemctl start nginx
+  when: nginx_exists is failed
+  args:
+    chdir: "{{ app_dir }}"
