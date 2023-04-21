@@ -8,16 +8,13 @@ orbs:
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/configuration-reference/#jobs
 
-executors:
-  node:
-    docker:
-      - image: circleci/node # deprecated
+# executors:
 
 # commands:
 
 jobs:
   assume:
-    executor: node
+    executor: aws-cli/default
     steps:
       - checkout
       - aws-cli/install
