@@ -5,17 +5,22 @@ version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@3.1.5
   ansible-playbook: orbss/ansible-playbook@0.0.5
+  python: circleci/python@2.0.3
 
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/configuration-reference/#jobs
 
-# executors:
+executors:
+  node:
+    docker:
+      - image: cimg/node:18.16.0
+      # - image: cimg/python:3.11.3-node
 
 # commands:
 
 jobs:
-  assume:
-    executor: aws-cli/default
+  execute-cloudformation:
+    executor: node
     steps:
       - checkout
       - aws-cli/install
@@ -43,7 +48,7 @@ jobs:
       #       aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
       #       aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
       #       aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
-      - run:
+      - run: 
           name: set environment variable
           command: |
             set -x
@@ -52,10 +57,28 @@ jobs:
             echo export S3_IAM_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMAccessKey")| .OutputValue')" >> $BASH_ENV
             echo export S3_IAM_SECRET_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMSecretAccessKey")| .OutputValue')" >> $BASH_ENV
             source $BASH_ENV
+      - run: |
+          cp $BASH_ENV bash.env
+      - persist_to_workspace:
+          root: .
+          paths:
+            - bash.env
+
   execute-ansible:
     executor: ansible-playbook/default
     steps:
       - checkout
+      - attach_workspace:
+          at: .
+      - run: |
+          cat bash.env >> $BASH_ENV
+      - run:
+          name: get envs
+          command: |
+            echo 'EC2_PUBLIC_IP_ADDRESS: '${EC2_PUBLIC_IP_ADDRESS:0:-1}
+            echo 'AWS_ALB: '${AWS_ALB:0:-1}
+            echo 'S3_IAM_ACCESS_KEY: '${S3_IAM_ACCESS_KEY:0:-1}
+            echo 'S3_IAM_SECRET_ACCESS_KEY: '${S3_IAM_SECRET_ACCESS_KEY:0:-1}
       - add_ssh_keys:
           fingerprints:
             - "a8:4a:8c:12:da:47:4a:2f:30:7c:1d:2a:0e:24:0f:67"
@@ -63,7 +86,7 @@ jobs:
           version: 2.10.7
       - ansible-playbook/playbook:
           playbook: ansible/playbook.yml
-          playbook-options: '-i ansible/inventory ansible_dev_target -m ping'
+          playbook-options: '-i ansible/inventory'
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
@@ -71,5 +94,8 @@ workflows:
   version: 2
   release:
     jobs:
-      - assume:
+      - execute-cloudformation:
           context: aws
+      - execute-ansible:
+          requires:
+              - execute-cloudformation
