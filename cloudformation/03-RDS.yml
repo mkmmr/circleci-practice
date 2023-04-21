@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TagName:
+    Description: this is base name.
+    Type: String
+    Default: CFn-raisetech
+  
+  RDSFamily:
+    Type: String
+    Default: MySQL8.0
+  
+  MySQLMasterUserPass:
+    Type: String
+    Default: password
+    NoEcho: true
+
+Resources:
+# ------------------------------------------------------------#
+#  RDS
+# ------------------------------------------------------------#
+# create RDS
+  CFnRDSMySQL:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub ${TagName}-rds-mysql
+      Engine: MySQL
+      EngineVersion: 8.0.32
+      MultiAZ: false
+      MasterUsername: root
+      MasterUserPassword: !Ref MySQLMasterUserPass
+      DBInstanceClass: db.t2.micro
+      StorageType: gp2
+      AllocatedStorage: 20
+      DBSubnetGroupName: !Ref CFnRDSSubnetGroup
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+      - !Ref CFnRDSSecurityGroup
+      AvailabilityZone: !Sub ${AWS::Region}a
+      Port: 3306
+      DBParameterGroupName: !Ref CFnRDSParameterGroup
+      OptionGroupName: !Ref CFnRDSOptionGroup
+      BackupRetentionPeriod: 0
+    DeletionPolicy: Delete
+
+# create RDS Security Group
+  CFnRDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${TagName}-rds-sg
+      GroupDescription: Allow EC2 Security Group access
+      VpcId: {'Fn::ImportValue': !Sub '${TagName}-vpc'}
+      SecurityGroupIngress:
+        # EC2 Security Group
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: {'Fn::ImportValue': !Sub '${TagName}-ec2-sg'}
+
+# create RDS Subnet Group
+  CFnRDSSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub ${TagName}-subnet-group
+      DBSubnetGroupDescription: !Sub ${TagName} RDS SubnetGroup
+      SubnetIds: 
+        - {'Fn::ImportValue': !Sub '${TagName}-private-subnet-a'}
+        - {'Fn::ImportValue': !Sub '${TagName}-private-subnet-c'}
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-rds-subnet-group
+
+# create RDS Parameter Group
+  CFnRDSParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: !Ref RDSFamily
+      Description: !Sub ${TagName} RDS MySQL8.0 ParamaterGroup
+      DBParameterGroupName: !Sub ${TagName}-mysql80
+
+# create RDS Option Group
+  CFnRDSOptionGroup:
+    Type: AWS::RDS::OptionGroup
+    Properties:
+      EngineName: mysql
+      MajorEngineVersion: 8.0
+      OptionGroupDescription: !Sub ${TagName}-mysql80
+      OptionGroupName: !Sub ${TagName}-mysql80
+      Tags:
+        - Key: Name
+          Value: !Sub ${TagName}-rds-option-group

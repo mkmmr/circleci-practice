@@ -2,25 +2,61 @@
 # See: https://circleci.com/docs/configuration-reference
 version: 2.1
 
+orbs:
+  aws-cli: circleci/aws-cli@3.1.5
+
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/configuration-reference/#jobs
+
+# executors:
+
+# commands:
+
 jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/configuration-reference/#executor-job
-    docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/configuration-reference/#steps
+  assume:
+    executor: aws-cli/default
     steps:
       - checkout
+      - aws-cli/install
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          name: Assume role
+          command: |
+            aws_sts_credentials=$(aws sts assume-role-with-web-identity \
+              --role-arn ${AWS_IAM_ROLE_ARN} \
+              --web-identity-token ${CIRCLE_OIDC_TOKEN} \
+              --role-session-name "circleci-oidc" \
+              --duration-seconds 1800 \
+              --query "Credentials" \
+              --output "json")
+            echo export AWS_ACCESS_KEY_ID="$(echo $aws_sts_credentials | jq -r '.AccessKeyId')" >> $BASH_ENV
+            echo export AWS_SECRET_ACCESS_KEY="$(echo $aws_sts_credentials | jq -r '.SecretAccessKey')" >> $BASH_ENV
+            echo export AWS_SESSION_TOKEN="$(echo $aws_sts_credentials | jq -r '.SessionToken')" >> $BASH_ENV
+            source $BASH_ENV
+      # - run:
+      #     name: deploy CloudFormation
+      #     command: |
+      #       set -x
+      #       aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
+      #       aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
+      #       aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
+      #       aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
+      #       aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
+      #       aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
+      - run:
+          name: set environment variable
+          command: |
+            set -x
+            echo export EC2_PUBLIC_IP_ADDRESS="$(aws ec2 describe-instances | jq '.Reservations[].Instances[] | select( .Tags[].Value=="CircleciEC2").PublicIpAddress')" >> $BASH_ENV
+            echo export AWS_ALB="$(aws elbv2 describe-load-balancers | jq '.LoadBalancers[] | select ( .LoadBalancerName=="CFn-raisetech-alb").DNSName')" >> $BASH_ENV
+            echo export S3_IAM_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMAccessKey")| .OutputValue')" >> $BASH_ENV
+            echo export S3_IAM_SECRET_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMSecretAccessKey")| .OutputValue')" >> $BASH_ENV
+            source $BASH_ENV
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
+  version: 2
+  release:
     jobs:
-      - say-hello
+      - assume:
+          context: aws
