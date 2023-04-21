@@ -1,0 +1,6 @@
+rbenv_path: "{{ ansible_user_dir }}/.rbenv"
+ruby_path: "{{ ansible_user_dir }}/.rbenv/plugins/ruby-build"
+ruby_version: 3.1.2
+ruby_dir: "{{ rbenv_path }}/versions/{{ ruby_version }}"
+rails_version: 7.0.4
+bundler_version: 2.3.14

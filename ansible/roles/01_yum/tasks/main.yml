@@ -1,0 +1,44 @@
+---
+- name: Update yum
+  become_user: root
+  yum: 
+    name: "*"
+    state: latest
+
+- name: yum install multi-list
+  become_user: root
+  yum:
+    name:
+      - git
+      - make
+      - gcc-c++
+      - patch
+      - openssl-devel
+      - libyaml-devel
+      - libffi-devel
+      - libicu-devel
+      - libxml2
+      - libxslt
+      - libxml2-devel
+      - libxslt-devel
+      - zlib-devel
+      - readline-devel
+      - ImageMagick
+      - ImageMagick-devel
+    state: present
+
+- name: install the mysql rpm from a remote repo
+  become_user: root
+  shell: |
+    sudo rpm --import "{{ mysql_gpg_key_url }}"
+    sudo rpm -Uvh "{{ mysql_package_url }}"
+
+- name: install the mysql
+  become_user: root
+  yum: 
+    name:
+      - mysql-server
+      - mysql-devel
+      - mysql-community-devel
+      - mysql-community-server
+    state: present

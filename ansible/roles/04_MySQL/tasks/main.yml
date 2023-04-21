@@ -1,0 +1,22 @@
+---
+- name: add database.yml
+  become_user: root
+  template:
+    src: database.yml.j2
+    dest: "{{ app_dir }}/config/database.yml"
+
+- name: make database
+  shell: |
+    sudo service mysqld start
+    bash -lc "rails db:create"
+    bash -lc "rails db:migrate"
+  timeout: 90
+  args: 
+    chdir: "{{ app_dir }}"
+
+- name: avoid asset pipeline error
+  shell: |
+    bash -lc "bundle exec rake assets:clean"
+    bash -lc "bundle exec rake assets:precompile"
+  args: 
+    chdir: "{{ app_dir }}"

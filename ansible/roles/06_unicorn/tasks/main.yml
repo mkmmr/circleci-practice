@@ -1,0 +1,22 @@
+---
+- name: update config/unicorn.rb
+  replace: 
+    path: "{{ app_dir }}/config/unicorn.rb"
+    regexp: |
+      listen '/home/ec2-user/raisetech-live8-sample-app/unicorn.sock'
+      pid    '/home/ec2-user/raisetech-live8-sample-app/unicorn.pid'
+    replace: |
+      listen '{{ app_dir }}/unicorn.sock'
+      pid    '{{ app_dir }}/unicorn.pid'
+
+- name: avoid blocked host error
+  blockinfile:
+    path: "{{ app_dir }}/config/environments/development.rb"
+    insertbefore: end
+    block: '  config.hosts << "${AWS_ALB}"'
+    # terraformからALBエンドポイントを渡してもらう必要あり
+
+- name: start unicorn
+  shell: bash -lc "bundle exec unicorn_rails -c config/unicorn.rb -D"
+  args: 
+    chdir: "{{ app_dir }}"
