@@ -36,24 +36,25 @@ jobs:
             echo export AWS_SECRET_ACCESS_KEY="$(echo $aws_sts_credentials | jq -r '.SecretAccessKey')" >> $BASH_ENV
             echo export AWS_SESSION_TOKEN="$(echo $aws_sts_credentials | jq -r '.SessionToken')" >> $BASH_ENV
             source $BASH_ENV
-      # - run:
-      #     name: deploy CloudFormation
-      #     command: |
-      #       set -x
-      #       aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
-      #       aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
-      #       aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
-      #       aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
-      #       aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
-      #       aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
+      - run:
+          name: deploy CloudFormation
+          command: |
+            set -x
+            aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
+            aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
+            aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
+            aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
+            aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
+            aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
       - run: 
           name: set environment variable
           command: |
             set -x
-            echo export EC2_PUBLIC_IP_ADDRESS="$(aws ec2 describe-instances | jq '.Reservations[].Instances[] | select( .Tags[].Value=="CircleciEC2").PublicIpAddress')" >> $BASH_ENV
+            echo export EC2_PUBLIC_IP_ADDRESS="$(aws ec2 describe-instances | jq '.Reservations[].Instances[] | select( .State.Name=="running" and .Tags[].Value=="CircleciEC2").PublicIpAddress')" >> $BASH_ENV
             echo export AWS_ALB="$(aws elbv2 describe-load-balancers | jq '.LoadBalancers[] | select ( .LoadBalancerName=="CFn-raisetech-alb").DNSName')" >> $BASH_ENV
             echo export S3_IAM_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMAccessKey")| .OutputValue')" >> $BASH_ENV
             echo export S3_IAM_SECRET_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMSecretAccessKey")| .OutputValue')" >> $BASH_ENV
+            echo export S3_BUCKET_NAME="$(aws s3 ls | sort -nr | head -n 1 | awk '{print $NF}')" >> $BASH_ENV
             source $BASH_ENV
       - run: |
           cp $BASH_ENV bash.env
