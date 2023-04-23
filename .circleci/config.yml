@@ -4,17 +4,21 @@ version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@3.1.5
+  ansible-playbook: orbss/ansible-playbook@0.0.5
 
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/configuration-reference/#jobs
 
-# executors:
+executors:
+  node:
+    docker:
+      - image: cimg/node:18.16.0
 
 # commands:
 
 jobs:
-  assume:
-    executor: aws-cli/default
+  execute-cloudformation:
+    executor: node
     steps:
       - checkout
       - aws-cli/install
@@ -32,25 +36,52 @@ jobs:
             echo export AWS_SECRET_ACCESS_KEY="$(echo $aws_sts_credentials | jq -r '.SecretAccessKey')" >> $BASH_ENV
             echo export AWS_SESSION_TOKEN="$(echo $aws_sts_credentials | jq -r '.SessionToken')" >> $BASH_ENV
             source $BASH_ENV
-      # - run:
-      #     name: deploy CloudFormation
-      #     command: |
-      #       set -x
-      #       aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
-      #       aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
-      #       aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
-      #       aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
-      #       aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
-      #       aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
       - run:
+          name: deploy CloudFormation
+          command: |
+            set -x
+            aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
+            aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
+            aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
+            aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
+            aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
+            aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
+      - run: 
           name: set environment variable
           command: |
             set -x
-            echo export EC2_PUBLIC_IP_ADDRESS="$(aws ec2 describe-instances | jq '.Reservations[].Instances[] | select( .Tags[].Value=="CircleciEC2").PublicIpAddress')" >> $BASH_ENV
+            echo export EC2_PUBLIC_IP_ADDRESS="$(aws ec2 describe-instances | jq '.Reservations[].Instances[] | select( .State.Name=="running" and .Tags[].Value=="CircleciEC2").PublicIpAddress')" >> $BASH_ENV
             echo export AWS_ALB="$(aws elbv2 describe-load-balancers | jq '.LoadBalancers[] | select ( .LoadBalancerName=="CFn-raisetech-alb").DNSName')" >> $BASH_ENV
             echo export S3_IAM_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMAccessKey")| .OutputValue')" >> $BASH_ENV
             echo export S3_IAM_SECRET_ACCESS_KEY="$(aws cloudformation describe-stacks --stack-name CircleciIAM | jq -r '.Stacks[] | .Outputs[] | select(.OutputKey == "StackIAMSecretAccessKey")| .OutputValue')" >> $BASH_ENV
+            echo export S3_BUCKET_NAME="$(aws s3 ls | sort -nr | head -n 1 | awk '{print $NF}')" >> $BASH_ENV
             source $BASH_ENV
+      - run: |
+          cp $BASH_ENV bash.env
+      - persist_to_workspace:
+          root: .
+          paths:
+            - bash.env
+
+  execute-ansible:
+    executor: ansible-playbook/default
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: |
+          cat bash.env >> $BASH_ENV
+      - run:
+          name: set inventory file
+          command: sed -i "1i ansible_dev_target ansible_host=${EC2_PUBLIC_IP_ADDRESS} ansible_connection=ssh ansible_user=ec2-user" ansible/inventory
+      - add_ssh_keys:
+          fingerprints:
+            - "a8:4a:8c:12:da:47:4a:2f:30:7c:1d:2a:0e:24:0f:67"
+      - ansible-playbook/install:
+          version: 2.10.7
+      - ansible-playbook/playbook:
+          playbook: ansible/playbook.yml
+          playbook-options: '-i ansible/inventory'
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
@@ -58,5 +89,8 @@ workflows:
   version: 2
   release:
     jobs:
-      - assume:
+      - execute-cloudformation:
           context: aws
+      - execute-ansible:
+          requires:
+              - execute-cloudformation
