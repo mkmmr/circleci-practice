@@ -9,27 +9,19 @@
     - "{{ app_dir }}/config/credentials/development.yml.enc"
     - "{{ app_dir }}/config/credentials/production.yml.enc"
 
-- name: check master.key
-  stat: 
-    path: "{{ app_dir }}/config/master.key"
-  register: master_key
+- name: set environment vars on taeget node
+  blockinfile:
+    dest: "{{ ansible_user_dir }}/.bash_profile"
+    insertafter: EOF
+    content: |
+      export PATH="$HOME/.rbenv/bin:$PATH"
+      eval "$(rbenv init -)"
+      export S3_IAM_ACCESS_KEY='{{ (lookup('env','S3_IAM_ACCESS_KEY')) }}'
+      export S3_IAM_SECRET_ACCESS_KEY='{{ (lookup('env','S3_IAM_SECRET_ACCESS_KEY')) }}'
+      export S3_BUCKET_NAME='{{ (lookup('env','S3_BUCKET_NAME')) }}'
 
-# - name: create new credentials.yml.enc and master.key
-#   shell: bash -lc 'EDITOR="vi" bin/rails credentials:edit'
-#   args: 
-#     chdir: "{{ app_dir }}"
-#   when: master_key.stat.exists == false
-
-# - name: update credentials.yml.enc
-#   blockinfile:
-#     dest: "{{ app_dir }}/config/credentials.yml.enc"
-#     insertafter: EOF
-#     content: |
-#       aws:
-#         access_key_id: SecretManagerから取得
-#         secret_access_key: SecretManagerから取得
-#         active_storage_bucket_name: cfn-raisetech
-#   when: master_key.stat.exists == false
+- name: reflect .bash_profile
+  shell: bash -lc "source {{ ansible_user_dir }}/.bash_profile"
 
 - name: update config/environments/development.rb
   replace: 
@@ -37,16 +29,31 @@
     regexp: config.active_storage.service = :local
     replace: config.active_storage.service = :amazon
 
-- name: update config/storage.yml
+- name: update config/storage.yml access_key_id
   replace: 
     path: "{{ app_dir }}/config/storage.yml"
     regexp: |
-      access_key_id: <%= Rails.application.credentials.dig(:aws, :access_key_id) %>
-      secret_access_key: <%= Rails.application.credentials.dig(:aws, :secret_access_key) %>
-      region: ap-northeast-1
-      bucket: <%= Rails.application.credentials.dig(:aws, :active_storage_bucket_name) %>
+      access_key_id\: \<\%\= Rails.application.credentials.dig\(\:aws, \:access_key_id\) \%\>
     replace: |
-      access_key_id: <%=  %>
-      secret_access_key: <%=  %>
-      region: ap-northeast-1
-      bucket: <%= %>
+      access_key_id: <%= ENV['S3_IAM_ACCESS_KEY'] %>
+
+- name: update config/storage.yml secret_access_key
+  replace: 
+    path: "{{ app_dir }}/config/storage.yml"
+    regexp: |
+      secret_access_key\: \<\%\= Rails.application.credentials.dig\(\:aws, \:secret_access_key\) \%\>
+    replace: |
+      secret_access_key: <%= ENV['S3_IAM_SECRET_ACCESS_KEY'] %>
+
+- name: update config/storage.yml buclet
+  replace: 
+    path: "{{ app_dir }}/config/storage.yml"
+    regexp: |
+      bucket\: \<\%\= Rails.application.credentials.dig\(\:aws, \:active_storage_bucket_name\) \%\>
+    replace: |
+      bucket: <%= ENV['S3_BUCKET_NAME'] %>
+
+- name: start unicorn
+  shell: bash -lc "bundle exec unicorn_rails -c config/unicorn.rb -D"
+  args: 
+    chdir: "{{ app_dir }}"

@@ -15,8 +15,3 @@
     insertbefore: end
     block: "  config.hosts << \"{{ (lookup('env','AWS_ALB')) }}\""
     # terraformからALBエンドポイントを渡してもらう必要あり
-
-- name: start unicorn
-  shell: bash -lc "bundle exec unicorn_rails -c config/unicorn.rb -D"
-  args: 
-    chdir: "{{ app_dir }}"
