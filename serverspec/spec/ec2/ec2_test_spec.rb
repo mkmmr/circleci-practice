@@ -14,6 +14,6 @@ describe command('curl http://127.0.0.1:#{listen_port}/_plugin/head/ -o /dev/nul
     its(:stdout) { should match /^200$/ }
 end
 
-describe command('ruby -v') do
-    its(:stdout) { should match /ruby 3\.1\.2/ }
+describe command('/home/ec2-user/.rbenv/shims/ruby --version') do
+    its(:stdout) { should match(/#{Regexp.escape('ruby 3.1.2p20 (2022-04-12 revision 4491bb740a) [x86_64-linux]')}/) }
 end
