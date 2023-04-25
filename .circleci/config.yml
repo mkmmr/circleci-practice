@@ -13,6 +13,9 @@ executors:
   node:
     docker:
       - image: cimg/node:18.16.0
+  ruby:
+    docker:
+      - image: cimg/ruby:3.2.2
 
 # commands:
 
@@ -36,16 +39,16 @@ jobs:
             echo export AWS_SECRET_ACCESS_KEY="$(echo $aws_sts_credentials | jq -r '.SecretAccessKey')" >> $BASH_ENV
             echo export AWS_SESSION_TOKEN="$(echo $aws_sts_credentials | jq -r '.SessionToken')" >> $BASH_ENV
             source $BASH_ENV
-      - run:
-          name: deploy CloudFormation
-          command: |
-            set -x
-            aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
-            aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
-            aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
-            aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
-            aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
-            aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
+      # - run:
+      #     name: deploy CloudFormation
+      #     command: |
+      #       set -x
+      #       aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
+      #       aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
+      #       aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
+      #       aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
+      #       aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
+      #       aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
       - run: 
           name: set environment variable
           command: |
@@ -83,6 +86,29 @@ jobs:
           playbook: ansible/playbook.yml
           playbook-options: '-i ansible/inventory'
 
+  execute-serverspec:
+    executor: ruby
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: |
+          cat bash.env >> $BASH_ENV
+      - run:
+          name: install serverspec
+          command: gem install serverspec
+      - run:
+          name: create ~/.ssh/config file
+          command: |
+            touch ~/.ssh/config
+            echo 'Host ec2' > ~/.ssh/config
+            sed -i "1a \  HostName\ ${EC2_PUBLIC_IP_ADDRESS}\n\  User\ ec2-user\n\  IdentityFile \$\{KEY_FINGERPRINT\}" ~/.ssh/config
+      - run: 
+          name: execute serverspece
+          command: |
+            cd serverspec
+            rake spec
+
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
@@ -91,6 +117,10 @@ workflows:
     jobs:
       - execute-cloudformation:
           context: aws
-      - execute-ansible:
+      # - execute-ansible:
+      #     requires:
+      #         - execute-cloudformation
+      - execute-serverspec:
           requires:
               - execute-cloudformation
+              # - execute-ansible
