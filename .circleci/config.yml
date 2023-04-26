@@ -1,13 +1,8 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine.
-# See: https://circleci.com/docs/configuration-reference
 version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@3.1.5
   ansible-playbook: orbss/ansible-playbook@0.0.5
-
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/configuration-reference/#jobs
 
 executors:
   node:
@@ -16,8 +11,6 @@ executors:
   ruby:
     docker:
       - image: cimg/ruby:3.2.2
-
-# commands:
 
 jobs:
   execute-cloudformation:
@@ -39,16 +32,16 @@ jobs:
             echo export AWS_SECRET_ACCESS_KEY="$(echo $aws_sts_credentials | jq -r '.SecretAccessKey')" >> $BASH_ENV
             echo export AWS_SESSION_TOKEN="$(echo $aws_sts_credentials | jq -r '.SessionToken')" >> $BASH_ENV
             source $BASH_ENV
-      # - run:
-      #     name: deploy CloudFormation
-      #     command: |
-      #       set -x
-      #       aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
-      #       aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
-      #       aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
-      #       aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
-      #       aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
-      #       aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
+      - run:
+          name: deploy CloudFormation
+          command: |
+            set -x
+            aws cloudformation deploy --template-file cloudformation/01-Network.yml --stack-name CircleciNetwork
+            aws cloudformation deploy --template-file cloudformation/02-EC2.yml --stack-name CircleciEC2
+            aws cloudformation deploy --template-file cloudformation/03-RDS.yml --stack-name CircleciRDS
+            aws cloudformation deploy --template-file cloudformation/04-ALB.yml --stack-name CircleciALB
+            aws cloudformation deploy --template-file cloudformation/05-IAM.yml --stack-name CircleciIAM --capabilities CAPABILITY_NAMED_IAM
+            aws cloudformation deploy --template-file cloudformation/06-S3.yml --stack-name CircleciS3
       - run: 
           name: set environment variable
           command: |
@@ -109,18 +102,15 @@ jobs:
             cd serverspec
             rake spec
 
-# Orchestrate jobs using workflows
-# See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
   version: 2
   release:
     jobs:
       - execute-cloudformation:
           context: aws
-      # - execute-ansible:
-      #     requires:
-      #         - execute-cloudformation
-      - execute-serverspec:
+      - execute-ansible:
           requires:
               - execute-cloudformation
-              # - execute-ansible
+      - execute-serverspec:
+          requires:
+              - execute-ansible

@@ -14,4 +14,3 @@
     path: "{{ app_dir }}/config/environments/development.rb"
     insertbefore: end
     block: "  config.hosts << \"{{ (lookup('env','AWS_ALB')) }}\""
-    # terraformからALBエンドポイントを渡してもらう必要あり

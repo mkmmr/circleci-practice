@@ -55,21 +55,6 @@ Resources:
           CidrIp: 0.0.0.0/0
 
 # ------------------------------------------------------------#
-# ElasticIP
-# ------------------------------------------------------------#                
-# create ElasticIP
-  # CFnElasticIP:
-  #   Type: "AWS::EC2::EIP"
-  #   Properties:
-  #     Domain: vpc
-
-  # CFnElasticIPAssociate:
-  #   Type: AWS::EC2::EIPAssociation
-  #   Properties: 
-  #     AllocationId: !GetAtt CFnElasticIP.AllocationId
-  #     InstanceId: !Ref CFnEC2
-
-# ------------------------------------------------------------#
 # Output Parameters
 # ------------------------------------------------------------#                
 Outputs:
