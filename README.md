@@ -5,6 +5,8 @@
 - Serverspecによるインフラテスト
 - 上記をGItHubへのpushをトリガーにCircleCIで一気通貫におこなう
 
+- 同じ内容で[Terraformバージョン](https://github.com/mkmmr/terraform-practice)も作成しています。
+
 ## 使用ツール
 - CircleCI
 - CloudFormation
@@ -12,11 +14,11 @@
 - Serverspec
 
 ## 事前準備
-- CircleCIとAWSをOICD連携する。
+- CircleCIとAWSをOIDC連携する。
 - EC2用のKeyPairを発行し、CircleCIのSSHパーミッションに設定する。
 
 ## 実装手順
-詳しくは[こちら](https://github.com/mkmmr/aws-practice/blob/main/lecture13.md)をご参照ください。
+詳しくは[こちら](https://github.com/mkmmr/aws-practice/blob/main/lecture13-CloudFormation-ver.md)をご参照ください。
 
 1. Ansble 実装手順
     - ローカルPCにAnsbleをインストール
